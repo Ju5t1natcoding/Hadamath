@@ -19,7 +19,7 @@ public:
         return this->y;
     }
 
-    T abs() const {
+    double abs() const {
         return std::hypot(this->x, this->y);
     }
 
