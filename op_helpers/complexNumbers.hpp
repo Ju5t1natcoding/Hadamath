@@ -102,10 +102,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& out, const complexNumber<T>& z) {
-        T y = z.im();
-        bool neg = y < 0;
-        if (neg) y = -y;
-        out << z.re() << (neg ? '-' : '+') << y << 'i';
+        out << z.re() << (std::signbit(z.im()) ? '-' : '+') << std::abs(z.im()) << 'i';
         return out;
     }
 };
