@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <vector>
 #include <iostream>
+#include <stdexcept>
+#include <string>
 
 template<typename T>
 class Matrix {
@@ -10,7 +12,7 @@ private:
     std::vector<std::vector<T>> mat;
 
 public:
-    Matrix(int32_t n, int32_t m, std::vector<std::vector<T>> v = {}): n(n), m(m), mat(v) {
+    Matrix(int32_t n, int32_t m, std::vector<std::vector<T>> v = {}): n(n), m(m), mat(v.empty() ? std::vector<std::vector<T>>(n, std::vector<T>(m, T())) : std::move(v)) {
     }
 
     int32_t lin() const {
@@ -21,14 +23,17 @@ public:
         return m;
     }
 
-    std::vector<T> operator[](int32_t i) const {
+    const std::vector<T>& operator[](int32_t i) const {
         return mat[i];
     }
 
-    constexpr Matrix<T>& operator+=(const Matrix<T>& m) {
-        if (this->n != m.n || this->m != m.m) {
-            std::cout << "Impossible operation to do\n" << flush;
-            return *this;
+    std::vector<T>& operator[](int32_t i) {
+        return mat[i];
+    }
+
+    Matrix<T>& operator+=(const Matrix<T>& m) {
+        if (this->n != m.lin() || this->m != m.col()) {
+            throw std::invalid_argument("Matrix +=: dimensions don't corelate properly -> (" + std::to_string(this->n) + "x" + std::to_string(this->m) + " vs " + std::to_string(m.lin()) + "x" + std::to_string(m.col()) + ")");
         }
 
         for (int32_t i = 0; i < this->n; ++i) {
@@ -40,10 +45,9 @@ public:
         return *this;
     }
 
-    constexpr Matrix<T>& operator-=(const Matrix<T>& m) {
-        if (this->n != m.n || this->m != m.m) {
-            std::cout << "Impossible operation to do\n" << flush;
-            return *this;
+    Matrix<T>& operator-=(const Matrix<T>& m) {
+        if (this->n != m.lin() || this->m != m.col()) {
+            throw std::invalid_argument("Matrix -=: dimensions don't corelate properly -> (" + std::to_string(this->n) + "x" + std::to_string(this->m) + " vs " + std::to_string(m.lin()) + "x" + std::to_string(m.col()) + ")");
         }
 
         for (int32_t i = 0; i < this->n; ++i) {
@@ -55,26 +59,26 @@ public:
         return *this;
     }
 
-    constexpr Matrix<T>& operator*=(const Matrix<T>& m) {
-        if (this->m != m.n) {
-            std::cout << "Impossible operation to do\n" << flush;
-            return *this;
+    Matrix<T>& operator*=(const Matrix<T>& m) {
+        if (this->m != m.lin()) {
+            throw std::invalid_argument("Matrix *=: dimensions don't corelate properly -> (" + std::to_string(this->n) + "x" + std::to_string(this->m) + " vs " + std::to_string(m.lin()) + "x" + std::to_string(m.col()) + ")");
         }
 
         std::vector<std::vector<T>> ans(this->n, std::vector<T>(m.col(), T()));
-        for (int32_t k = 0; k < m.lin(); ++k) {
-            for (int32_t i = 0; i < this->n; ++i) {
+        for (int32_t i = 0; i < this->n; ++i) {
+            for (int32_t k = 0; k < m.lin(); ++k) {
                 for (int32_t j = 0; j < m.col(); ++j) {
-                    ans[i][j] += this->mat[i][j] * m[i][j];
+                    ans[i][j] += this->mat[i][k] * m[k][j];
                 }
             }
         }
 
-        this->mat = ans;
+        this->mat = std::move(ans);
+        this->m = m.col();
         return *this;
     }
 
-    constexpr Matrix<T>& operator*=(T x) {
+    Matrix<T>& operator*=(T x) {
         for (int32_t i = 0; i < this->n; ++i) {
             for (int32_t j = 0; j < this->m; ++j) {
                 this->mat[i][j] *= x;
@@ -94,19 +98,23 @@ public:
         return *this;
     }
 
-    friend constexpr Matrix<T> operator+(Matrix<T> a, const Matrix<T>& b) {
+    friend Matrix<T> operator+(Matrix<T> a, const Matrix<T>& b) {
         return a += b;
     }
 
-    friend constexpr Matrix<T> operator-(Matrix<T> a, const Matrix<T>& b) {
+    friend Matrix<T> operator-(Matrix<T> a, const Matrix<T>& b) {
         return a -= b;
     }
 
-    friend constexpr Matrix<T> operator*(Matrix<T> a, const Matrix<T>& b) {
+    friend Matrix<T> operator*(Matrix<T> a, const Matrix<T>& b) {
         return a *= b;
     }
 
-    friend constexpr Matrix<T> operator*(T x, Matrix<T> a) {
+    friend Matrix<T> operator*(T x, Matrix<T> a) {
+        return a *= x;
+    }
+
+    friend Matrix<T> operator*(Matrix<T> a, T x) {
         return a *= x;
     }
 
@@ -115,8 +123,8 @@ public:
     }
 
     friend Matrix<T> tensorial_product(const Matrix<T>& a, const Matrix<T>& b) {
-        std::vector<std::vector<T>> ans;
         int32_t n1 = a.lin(), m1 = a.col(), n2 = b.lin(), m2 = b.col();
+        Matrix<T> ans(n1 * n2, m1 * m2);
 
         for (int32_t i = 0; i < n1; ++i) {
             for (int32_t j = 0; j < m1; ++j) {
@@ -131,10 +139,10 @@ public:
         return ans;
     }
 
-    std::istream& operator>>(std::istream& in, Matrix<T>& mat) {
+    friend std::istream& operator>>(std::istream& in, Matrix<T>& mat) {
         int32_t n, m;
         in >> n >> m;
-        std::vector<std::vector<T>> v;
+        std::vector<std::vector<T>> v(n, std::vector<T>(m));
 
         for (int32_t i = 0; i < n; ++i) {
             for (int32_t j = 0; j < m; ++j) {
@@ -146,7 +154,7 @@ public:
         return in;
     }
 
-    std::ostream& operator<<(std::ostream& out, const Matrix<T>& mat) {
+    friend std::ostream& operator<<(std::ostream& out, const Matrix<T>& mat) {
         int32_t n = mat.lin(), m = mat.col();
         for (int32_t i = 0; i < n; ++i) {
             for (int32_t j = 0; j < m; ++j) {
