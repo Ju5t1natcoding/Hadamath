@@ -3,8 +3,8 @@
 #include <cstdlib>
 #include <cstdio>
 
-inline void clear_screen() {
-    #if defined(_WIN32) || defined(_WIN64)
+inline void clearScreen() {
+    #ifdef _WIN32
         std::system("cls");
     #elif defined(__linux__) || defined(__APPLE__)
         std::system("clear")
